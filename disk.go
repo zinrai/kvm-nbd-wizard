@@ -9,24 +9,29 @@ import (
 
 func connectNBD(diskPath, nbdDevice string) error {
 	cmd := exec.Command("qemu-nbd", "--connect="+nbdDevice, diskPath)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to connect NBD: %v", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to connect NBD: %v, output: %s", err, output)
 	}
+	fmt.Printf("NBD device %s connected\n", nbdDevice)
+
+	// Waiting time before nbd partition is mapped
+	time.Sleep(3 * time.Second)
+
 	return nil
 }
 
 func disconnectNBD(nbdDevice string) error {
 	cmd := exec.Command("qemu-nbd", "--disconnect", nbdDevice)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to disconnect NBD: %v", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to disconnect NBD: %v, output: %s", err, output)
 	}
+	fmt.Printf("NBD device %s disconnected\n", nbdDevice)
 	return nil
 }
 
 func getPartitions(nbdDevice string) ([]string, error) {
-	// Ensure that nbd partitions are not executed before they are mapped.
-	time.Sleep(3 * time.Second)
-
 	cmd := exec.Command("fdisk", "-l", nbdDevice)
 	output, err := cmd.Output()
 	if err != nil {

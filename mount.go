@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -76,18 +75,14 @@ func connectAndMount(diskPath string) error {
 		return err
 	}
 
-	defer func() {
-		if err := disconnectNBD(nbdDevice); err != nil {
-			log.Printf("Error disconnecting NBD: %v\n", err)
-		}
-	}()
-
 	partitions, err := getPartitions(nbdDevice)
 	if err != nil {
-		return err
+		disconnectNBD(nbdDevice) // Cleanup on error
+		return fmt.Errorf("failed to get partitions: %v", err)
 	}
 
 	if len(partitions) == 0 {
+		disconnectNBD(nbdDevice) // Cleanup on error
 		return fmt.Errorf("no partitions found")
 	}
 
@@ -101,10 +96,12 @@ func connectAndMount(diskPath string) error {
 	mountPoint := getMountPoint()
 
 	if err := mountPartition(selectedPartition, mountPoint); err != nil {
-		return err
+		disconnectNBD(nbdDevice) // Cleanup on error
+		return fmt.Errorf("failed to mount partition: %v", err)
 	}
 
 	fmt.Printf("Partition %s mounted at %s\n", selectedPartition, mountPoint)
+	fmt.Printf("NBD device %s remains connected. Use 'disconnect' option to unmount and disconnect.\n", nbdDevice)
 	return nil
 }
 
@@ -118,7 +115,7 @@ func disconnectAndUnmount() error {
 
 	for _, mountPoint := range mountedPartitions {
 		if err := unmountPartition(mountPoint); err != nil {
-			log.Printf("Error unmounting %s: %v\n", mountPoint, err)
+			fmt.Printf("Error unmounting %s: %v\n", mountPoint, err)
 		} else {
 			fmt.Printf("Unmounted %s\n", mountPoint)
 		}
@@ -128,7 +125,6 @@ func disconnectAndUnmount() error {
 		return fmt.Errorf("failed to disconnect NBD: %v", err)
 	}
 
-	fmt.Printf("Disconnected %s\n", nbdDevice)
 	return nil
 }
 
